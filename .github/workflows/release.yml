@@ -5,6 +5,18 @@ on:
     branches:
       - master
       - main
+    paths:
+      - 'src/**'
+      - 'src-tauri/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - 'vite.config.ts'
+      - 'tailwind.config.js'
+      - 'postcss.config.js'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/release.yml'
     tags:
       - 'v*'
   workflow_dispatch:
