@@ -22,7 +22,7 @@ use commands::{
     session_list, session_create, session_connect, session_kill, session_kill_all,
     session_send_input, session_send_bytes, session_resize,
     session_attach, session_detach, get_server_status,
-    detect_ai_tools, install_to_tool, uninstall_from_tool,
+    detect_ai_tools, install_to_tool, uninstall_from_tool, get_vshell_path, add_vshell_to_path,
     get_servers, add_server, update_server, delete_server,
     get_groups, add_group, delete_group,
     save_credential, get_credential, delete_credential,
@@ -131,6 +131,8 @@ pub fn run() {
             detect_ai_tools,
             install_to_tool,
             uninstall_from_tool,
+            get_vshell_path,
+            add_vshell_to_path,
             // Server management commands
             get_servers,
             add_server,

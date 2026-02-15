@@ -8,6 +8,7 @@ on:
     paths:
       - 'src/**'
       - 'src-tauri/**'
+      - 'cli/**'
       - 'package.json'
       - 'package-lock.json'
       - 'tsconfig*.json'
@@ -206,6 +207,16 @@ jobs:
       - name: Install frontend dependencies
         run: npm ci
 
+      - name: Build vshell CLI
+        run: |
+          if [[ "${{ matrix.args }}" == *"--target"* ]]; then
+            TARGET=$(echo "${{ matrix.args }}" | grep -oP '(?<=--target )\S+')
+            cargo build --release --package vshell --target $TARGET
+          else
+            cargo build --release --package vshell
+          fi
+        shell: bash
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
@@ -213,3 +224,50 @@ jobs:
         with:
           releaseId: ${{ needs.bump-and-release.outputs.release_id }}
           args: ${{ matrix.args }}
+
+      - name: Rename and upload vshell CLI binary
+        shell: bash
+        run: |
+          VERSION="${{ needs.bump-and-release.outputs.new_version }}"
+
+          # Find the built vshell binary
+          if [[ "${{ matrix.args }}" == *"--target"* ]]; then
+            TARGET=$(echo "${{ matrix.args }}" | grep -oP '(?<=--target )\S+' || true)
+            BINARY="target/${TARGET}/release/vshell"
+          else
+            BINARY="target/release/vshell"
+          fi
+
+          # Determine platform suffix and extension
+          case "${{ matrix.platform }}" in
+            windows-latest)
+              BINARY="${BINARY}.exe"
+              DEST="vshell-${VERSION}-windows-x64.exe"
+              ;;
+            macos-latest)
+              if [[ "${{ matrix.args }}" == *"aarch64"* ]]; then
+                DEST="vshell-${VERSION}-macos-arm64"
+              else
+                DEST="vshell-${VERSION}-macos-x64"
+              fi
+              ;;
+            ubuntu-22.04)
+              DEST="vshell-${VERSION}-linux-x64"
+              ;;
+          esac
+
+          if [ -f "$BINARY" ]; then
+            cp "$BINARY" "$DEST"
+            echo "VSHELL_BINARY=$DEST" >> $GITHUB_ENV
+          else
+            echo "Warning: vshell binary not found at $BINARY"
+          fi
+
+      - name: Upload vshell CLI to release
+        if: env.VSHELL_BINARY != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.bump-and-release.outputs.tag_name }}
+          files: ${{ env.VSHELL_BINARY }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

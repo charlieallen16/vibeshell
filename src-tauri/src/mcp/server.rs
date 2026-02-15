@@ -235,6 +235,11 @@ async fn handle_tools_call(
 
 // === Tool Execution ===
 
+/// Execute a tool by name — public wrapper for use by stdio transport.
+pub async fn execute_tool_public(state: &McpState, name: &str, args: &Value) -> Result<String, String> {
+    execute_tool(state, name, args).await
+}
+
 async fn execute_tool(state: &McpState, name: &str, args: &Value) -> Result<String, String> {
     match name {
         // Server Management

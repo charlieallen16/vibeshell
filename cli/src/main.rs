@@ -78,7 +78,11 @@ struct KillArgs {
 
 #[derive(Args)]
 struct SkillServerArgs {
-    /// Port to listen on
+    /// Use stdio transport (stdin/stdout JSON-RPC) — required by Claude Code, Codex, Cursor
+    #[arg(long)]
+    stdio: bool,
+
+    /// Port to listen on (HTTP mode, ignored when --stdio is set)
     #[arg(long, default_value = "3000")]
     port: u16,
 }
@@ -124,7 +128,11 @@ fn main() -> Result<()> {
             }
         }
         Some(Commands::SkillServer(args)) => {
-            run_skill_server(args.port)
+            if args.stdio {
+                run_skill_server_stdio()
+            } else {
+                run_skill_server(args.port)
+            }
         }
         Some(Commands::Tools) => {
             commands::install::list_tools()
@@ -144,30 +152,47 @@ fn main() -> Result<()> {
     }
 }
 
-/// Run the skill server on the specified port
+/// Run the skill server on the specified port (HTTP mode)
 fn run_skill_server(port: u16) -> Result<()> {
-    // Create a tokio runtime for the async skill server
     let rt = tokio::runtime::Runtime::new()?;
 
     rt.block_on(async {
-        // Initialize database
         let database = Arc::new(
             vibeshell_core::Database::new()
                 .expect("Failed to initialize database")
         );
-
-        // Initialize session manager
         let session_manager = Arc::new(
             vibeshell_core::SessionManager::new(database.clone())
         );
 
-        // Create and run skill server (MCP protocol)
         let server = vibeshell_core::McpServer::new(database, session_manager);
 
-        println!("Starting VibeShell Skill Server...");
-        println!("Use Ctrl+C to stop the server.");
+        eprintln!("Starting VibeShell Skill Server (HTTP)...");
+        eprintln!("Use Ctrl+C to stop the server.");
 
         server.run(port).await
+    })?;
+
+    Ok(())
+}
+
+/// Run the skill server in stdio mode (stdin/stdout JSON-RPC).
+///
+/// This is the standard transport for Claude Code, Codex CLI, Cursor, etc.
+/// The server reads JSON-RPC requests from stdin and writes responses to stdout.
+fn run_skill_server_stdio() -> Result<()> {
+    let rt = tokio::runtime::Runtime::new()?;
+
+    rt.block_on(async {
+        let database = Arc::new(
+            vibeshell_core::Database::new()
+                .expect("Failed to initialize database")
+        );
+        let session_manager = Arc::new(
+            vibeshell_core::SessionManager::new(database.clone())
+        );
+
+        vibeshell_core::mcp::stdio::run_stdio(database, session_manager).await
     })?;
 
     Ok(())

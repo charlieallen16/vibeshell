@@ -1,11 +1,13 @@
-//! AI tool detection for VibeShell skill configuration.
+//! AI tool detection for VibeShell skill installation.
 //!
-//! This module provides functionality to detect installed AI coding tools
-//! and check whether VibeShell skill is configured in each tool.
+//! This module detects installed AI coding tools and checks whether
+//! the VibeShell SKILL.md is installed in each tool's skills directory.
+//!
+//! Detection is based on SKILL.md presence only — we do NOT check
+//! MCP config files (mcp.json, etc.).
 
 use std::path::PathBuf;
 
-use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 /// Represents an AI coding tool that can have the VibeShell skill installed.
@@ -15,20 +17,20 @@ pub struct AiTool {
     pub id: String,
     /// Human-readable name of the tool
     pub name: String,
-    /// Path to the tool's configuration file
+    /// Path to the tool's configuration file (kept for API compat)
     pub config_path: PathBuf,
     /// Whether the AI tool is detected/installed on the system
     pub installed: bool,
-    /// Whether the VibeShell skill is installed in the tool
+    /// Whether the VibeShell SKILL.md is installed in the tool
     pub vibeshell_installed: bool,
 }
 
 impl AiTool {
-    /// Create a new AiTool instance from multiple candidate config paths.
+    /// Create a new AiTool instance.
     ///
-    /// Selection rule:
-    /// 1. Prefer the first existing config file path
-    /// 2. Otherwise fall back to the default path (first candidate)
+    /// Detection:
+    /// - `installed`: true if any of the candidate directories exist
+    /// - `vibeshell_installed`: true if SKILL.md exists in the skills dir
     fn from_candidates(id: &str, name: &str, candidates: Vec<PathBuf>) -> Self {
         let config_path = select_preferred_config_path(&candidates)
             .unwrap_or_else(|| PathBuf::from("mcp.json"));
@@ -37,7 +39,7 @@ impl AiTool {
             .iter()
             .any(|path| path.parent().map(|p| p.exists()).unwrap_or(false));
 
-        let vibeshell_installed = check_vibeshell_installed(&config_path).unwrap_or(false);
+        let vibeshell_installed = check_skill_installed(id);
 
         Self {
             id: id.to_string(),
@@ -55,8 +57,6 @@ fn get_home_dir() -> Option<PathBuf> {
 }
 
 /// Select preferred config path from candidates.
-///
-/// Rule: existing file path first, otherwise default path (first candidate).
 fn select_preferred_config_path(candidates: &[PathBuf]) -> Option<PathBuf> {
     if let Some(existing) = candidates.iter().find(|path| path.exists()) {
         return Some(existing.clone());
@@ -65,37 +65,26 @@ fn select_preferred_config_path(candidates: &[PathBuf]) -> Option<PathBuf> {
     candidates.first().cloned()
 }
 
-/// Check if the VibeShell skill is installed in the given config file.
+/// Check if the VibeShell SKILL.md is installed for the given tool.
 ///
-/// Checks both the MCP config (mcp.json) and the skills directory (skills/vibeshell/SKILL.md).
-fn check_vibeshell_installed(config_path: &PathBuf) -> Result<bool> {
-    // Check MCP config
-    if config_path.exists() {
-        let content = std::fs::read_to_string(config_path)?;
-        let json: serde_json::Value = serde_json::from_str(&content)?;
+/// Only checks the skills directory — does NOT inspect MCP configs.
+fn check_skill_installed(tool_id: &str) -> bool {
+    let home = match get_home_dir() {
+        Some(h) => h,
+        None => return false,
+    };
 
-        // Nested MCP format: { "mcpServers": { "vibeshell": { ... } } }
-        if let Some(mcp_servers) = json.get("mcpServers").and_then(|v| v.as_object()) {
-            if mcp_servers.get("vibeshell").is_some() {
-                return Ok(true);
-            }
-        }
+    let skills_dir = match tool_id {
+        "claude-code" => home.join(".claude").join("skills"),
+        "cursor" => home.join(".cursor").join("skills"),
+        "codex" => home.join(".codex").join("skills"),
+        "opencode" => home.join(".opencode").join("skills"),
+        "gemini-cli" => home.join(".gemini").join("skills"),
+        "openclaw" => home.join(".openclaw").join("skills"),
+        _ => return false,
+    };
 
-        // Root format: { "vibeshell": { ... } }
-        if json.get("vibeshell").is_some() {
-            return Ok(true);
-        }
-    }
-
-    // Also check for skill file in the skills directory
-    if let Some(parent) = config_path.parent() {
-        let skill_path = parent.join("skills").join("vibeshell").join("SKILL.md");
-        if skill_path.exists() {
-            return Ok(true);
-        }
-    }
-
-    Ok(false)
+    skills_dir.join("vibeshell").join("SKILL.md").exists()
 }
 
 /// Detect all supported AI tools and their skill installation status.
@@ -198,7 +187,6 @@ pub fn get_configured_tools() -> Vec<AiTool> {
 mod tests {
     use super::*;
     use std::fs;
-    use std::io::Write;
     use tempfile::TempDir;
 
     #[test]
@@ -244,25 +232,5 @@ mod tests {
 
         let selected = select_preferred_config_path(&[default_path.clone(), second]);
         assert_eq!(selected, Some(default_path));
-    }
-
-    #[test]
-    fn test_check_vibeshell_installed_supports_both_json_shapes() {
-        let dir = TempDir::new().unwrap();
-
-        let nested_path = dir.path().join("nested.json");
-        let mut nested_file = fs::File::create(&nested_path).unwrap();
-        nested_file
-            .write_all(br#"{"mcpServers":{"vibeshell":{"command":"vshell"}}}"#)
-            .unwrap();
-
-        let root_path = dir.path().join("root.json");
-        let mut root_file = fs::File::create(&root_path).unwrap();
-        root_file
-            .write_all(br#"{"vibeshell":{"command":"vshell"}}"#)
-            .unwrap();
-
-        assert!(check_vibeshell_installed(&nested_path).unwrap());
-        assert!(check_vibeshell_installed(&root_path).unwrap());
     }
 }

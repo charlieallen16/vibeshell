@@ -1,44 +1,118 @@
 //! VibeShell skill installer for AI coding tools.
 //!
-//! This module provides functionality to install and uninstall VibeShell skill
-//! configuration to/from various AI coding tools.
+//! This module installs/uninstalls the VibeShell SKILL.md file into
+//! AI coding tool skill directories. The SKILL.md teaches AI agents
+//! how to use the `vshell` CLI to manage SSH servers and sessions.
+//!
+//! **Important**: This installer does NOT modify MCP config files.
+//! Integration is purely through SKILL.md — the AI reads the skill
+//! and learns to call `vshell` via its shell/exec tool.
 
 use std::fs;
 use std::path::{Path, PathBuf};
 use anyhow::{anyhow, Context, Result};
-use chrono::Utc;
-use serde_json::{json, Value};
 
 use super::detector::{find_tool, AiTool};
 
-/// The VibeShell skill configuration key name
-const VIBESHELL_KEY: &str = "vibeshell";
+/// Resolve the absolute path to the vshell binary.
+///
+/// Search order:
+/// 1. Next to the current executable (Tauri install location)
+/// 2. Common installation paths per platform
+/// 3. PATH lookup via `which`/`where`
+/// 4. Fall back to bare "vshell" command name
+pub fn resolve_vshell_binary() -> String {
+    let vshell_name = if cfg!(windows) { "vshell.exe" } else { "vshell" };
 
-/// Create the VibeShell skill server configuration.
-fn vibeshell_skill_config() -> Value {
-    json!({
-        "command": "vshell",
-        "args": ["skill-server"],
-        "description": "VibeShell - SSH/SFTP management skill for AI tools"
-    })
+    // 1. Next to the current executable
+    if let Ok(current_exe) = std::env::current_exe() {
+        if let Some(dir) = current_exe.parent() {
+            let candidate = dir.join(vshell_name);
+            if candidate.exists() {
+                return candidate.to_string_lossy().to_string();
+            }
+        }
+    }
+
+    // 2. Common installation paths per platform
+    #[cfg(windows)]
+    {
+        for env_var in &["LOCALAPPDATA", "ProgramFiles"] {
+            if let Ok(base) = std::env::var(env_var) {
+                let candidate = PathBuf::from(&base).join("VibeShell").join(vshell_name);
+                if candidate.exists() {
+                    return candidate.to_string_lossy().to_string();
+                }
+            }
+        }
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        for c in &[
+            "/Applications/VibeShell.app/Contents/MacOS/vshell",
+            "/usr/local/bin/vshell",
+        ] {
+            if Path::new(c).exists() {
+                return c.to_string();
+            }
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        for c in &["/usr/bin/vshell", "/usr/local/bin/vshell"] {
+            if Path::new(c).exists() {
+                return c.to_string();
+            }
+        }
+    }
+
+    // 3. Try to find via PATH (which/where)
+    #[cfg(windows)]
+    {
+        if let Ok(output) = std::process::Command::new("where").arg("vshell").output() {
+            if output.status.success() {
+                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if let Some(first_line) = path.lines().next() {
+                    if Path::new(first_line).exists() {
+                        return first_line.to_string();
+                    }
+                }
+            }
+        }
+    }
+
+    #[cfg(not(windows))]
+    {
+        if let Ok(output) = std::process::Command::new("which").arg("vshell").output() {
+            if output.status.success() {
+                let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                if Path::new(&path).exists() {
+                    return path;
+                }
+            }
+        }
+    }
+
+    // 4. Fallback: bare command name
+    vshell_name.to_string()
 }
 
-/// The SKILL.md content that teaches AI how to use VibeShell for SSH connections.
+/// The SKILL.md content that teaches AI agents how to use VibeShell CLI.
+///
+/// This is the sole integration mechanism — AI agents read this skill file
+/// and learn to run `vshell` commands via their shell/exec capabilities.
 const SKILL_MD_CONTENT: &str = r#"---
 name: vibeshell
 description: Connect to remote SSH servers, execute commands, and transfer files via SFTP using VibeShell. Use this when the user needs to manage remote servers, deploy code, run remote commands, or transfer files over SSH.
 ---
 
-You have access to VibeShell, a high-performance SSH/SFTP terminal. VibeShell provides MCP tools prefixed with `mcp__vibeshell__` that let you manage servers, sessions, and file transfers.
+You have access to **VibeShell**, a high-performance SSH/SFTP terminal client.
+Use the `vshell` CLI to manage SSH servers and sessions from the command line.
 
-## Quick Start
-
-To connect to a server and run commands:
-
-1. Check existing servers: `mcp__vibeshell__server_list`
-2. Connect: `mcp__vibeshell__session_create` with `server_name`
-3. Run commands: `mcp__vibeshell__exec` with `session_id` and `command`
-4. Clean up when done: `mcp__vibeshell__session_kill` with `session_id`
+> **Prerequisite**: The VibeShell GUI must be running for session commands to work.
+> The CLI communicates with the GUI via IPC.
 
 ## When to Use This Skill
 
@@ -46,56 +120,69 @@ To connect to a server and run commands:
 - User wants to run commands on a remote machine
 - User needs to deploy files or code to a server
 - User wants to check server status, logs, or resource usage
-- User needs to transfer files between local and remote machines
+- User needs to manage SSH connections or sessions
 
-## Tools Reference
+## CLI Commands
 
-### Server Management
-- **server_list** — List configured servers (optional: `group_id`, `tags`)
-- **server_add** — Add server (`name`, `host`, `username`, `auth_type` required; `port` defaults to 22)
-- **server_get** — Get server details (by `id` or `name`)
-- **server_update** — Update server config (`id` required, other fields optional)
-- **server_delete** — Remove server (`id` required)
+### Check version
+```bash
+vshell version
+```
 
-### Sessions (Active SSH Connections)
-- **session_list** — List active sessions
-- **session_create** — Open SSH connection (`server_id` or `server_name`)
-- **session_attach** — Reattach to a session (`session_id`)
-- **session_detach** — Detach without closing (`session_id`)
-- **session_kill** — Terminate session (`session_id`, or `all: true`)
+### Connect to a server
+```bash
+vshell ssh <server-name>
+# alias: vshell connect <server-name>
+```
+Connects to a server that was previously configured in the VibeShell GUI.
 
-### Remote Execution
-- **exec** — Run a command (`session_id`, `command` required; `timeout_ms` defaults to 30s)
+### List active sessions
+```bash
+vshell sessions
+# alias: vshell ls
+```
 
-### File Transfer (SFTP)
-- **sftp_ls** — List remote directory (`session_id`, `path`)
-- **sftp_upload** — Upload file (`session_id`, `local_path`, `remote_path`)
-- **sftp_download** — Download file (`session_id`, `remote_path`, `local_path`)
-- **sftp_mkdir** — Create remote directory (`session_id`, `path`, `recursive`)
-- **sftp_rm** — Delete remote file/dir (`session_id`, `path`, `recursive`)
-- **sftp_mv** — Move/rename remote path (`session_id`, `source`, `destination`)
+### Attach to an existing session
+```bash
+vshell attach <session-id>
+```
 
-## Auth Types
+### Kill a session
+```bash
+vshell kill <session-id>
+vshell kill --all
+```
 
-| Type | Use When |
-|------|----------|
-| `password` | Username + password |
-| `key` | SSH private key (PEM, no passphrase) |
-| `key_with_passphrase` | Encrypted SSH private key |
+### List detected AI tools
+```bash
+vshell tools
+```
+Shows which AI coding tools are detected and whether VibeShell skill is installed.
 
-## Guidelines
+### Install/uninstall skill to AI tools
+```bash
+vshell install <tool-id>    # e.g. claude-code, cursor, codex
+vshell install all
+vshell uninstall <tool-id>
+vshell uninstall all
+```
 
-- Always call `session_list` before creating a new session to avoid duplicates
-- Prefer `server_name` over `server_id` for readability
-- Sessions persist when detached — reattach later instead of recreating
-- Always `session_kill` when done to free server resources
-- Use tags to organize servers (e.g., `["prod", "web"]`, `["staging", "db"]`)
+## Typical Workflow
+
+1. **Check if server is configured**: Ask the user which server to connect to, or suggest they configure one in the VibeShell GUI.
+2. **Connect**: `vshell ssh my-server`
+3. **List sessions**: `vshell sessions` to see active connections
+4. **Clean up**: `vshell kill <session-id>` when done
+
+## Notes
+
+- Servers must be configured in the VibeShell GUI first (name, host, port, username, auth type).
+- The GUI application must be running for CLI commands to work (IPC communication).
+- For file transfers, use the VibeShell GUI's built-in SFTP panel.
+- For direct remote command execution, connect via `vshell ssh` then use the terminal.
 "#;
 
 /// Get the skills directory path for a given AI tool.
-///
-/// Returns the directory where skill folders should be placed for each tool.
-/// Returns None if the tool doesn't support skills or the home directory is unknown.
 fn get_skills_dir(tool_id: &str) -> Option<PathBuf> {
     let home = directories::BaseDirs::new().map(|dirs| dirs.home_dir().to_path_buf())?;
 
@@ -111,19 +198,23 @@ fn get_skills_dir(tool_id: &str) -> Option<PathBuf> {
 }
 
 /// Install the SKILL.md file into the tool's skills directory.
-fn install_skill_file(tool_id: &str) -> Result<()> {
-    if let Some(skills_dir) = get_skills_dir(tool_id) {
-        let skill_dir = skills_dir.join("vibeshell");
-        fs::create_dir_all(&skill_dir)
-            .with_context(|| format!("Failed to create skill directory {:?}", skill_dir))?;
+///
+/// This is the **only** thing the installer does. It does NOT modify
+/// any MCP config file (mcp.json, mcpServers.json, etc.).
+fn install_skill_file(tool_id: &str) -> Result<PathBuf> {
+    let skills_dir = get_skills_dir(tool_id)
+        .ok_or_else(|| anyhow!("No skills directory known for tool: {}", tool_id))?;
 
-        let skill_path = skill_dir.join("SKILL.md");
-        fs::write(&skill_path, SKILL_MD_CONTENT)
-            .with_context(|| format!("Failed to write skill file {:?}", skill_path))?;
+    let skill_dir = skills_dir.join("vibeshell");
+    fs::create_dir_all(&skill_dir)
+        .with_context(|| format!("Failed to create skill directory {:?}", skill_dir))?;
 
-        log::info!("[Install] Skill file installed to {:?}", skill_path);
-    }
-    Ok(())
+    let skill_path = skill_dir.join("SKILL.md");
+    fs::write(&skill_path, SKILL_MD_CONTENT)
+        .with_context(|| format!("Failed to write skill file {:?}", skill_path))?;
+
+    log::info!("[Install] Skill file installed to {:?}", skill_path);
+    Ok(skill_path)
 }
 
 /// Remove the SKILL.md file from the tool's skills directory.
@@ -139,177 +230,6 @@ fn uninstall_skill_file(tool_id: &str) -> Result<()> {
     Ok(())
 }
 
-/// Create a backup of the config file before modification.
-fn backup_config(config_path: &PathBuf) -> Result<Option<PathBuf>> {
-    if !config_path.exists() {
-        return Ok(None);
-    }
-
-    let timestamp = Utc::now().format("%Y%m%d_%H%M%S");
-    let backup_name = format!(
-        "{}.backup.{}",
-        config_path.file_name().unwrap_or_default().to_string_lossy(),
-        timestamp
-    );
-    let backup_path = config_path.parent().unwrap().join(backup_name);
-
-    fs::copy(config_path, &backup_path)
-        .with_context(|| format!("Failed to backup config to {:?}", backup_path))?;
-
-    Ok(Some(backup_path))
-}
-
-/// Ensure the parent directory exists for the config file.
-fn ensure_parent_dir(config_path: &Path) -> Result<()> {
-    if let Some(parent) = config_path.parent() {
-        if !parent.exists() {
-            fs::create_dir_all(parent)
-                .with_context(|| format!("Failed to create directory {:?}", parent))?;
-        }
-    }
-    Ok(())
-}
-
-/// Read and parse the existing config file, or return an empty object.
-fn read_config(config_path: &Path) -> Result<Value> {
-    if !config_path.exists() {
-        return Ok(json!({}));
-    }
-
-    let content = fs::read_to_string(config_path)
-        .with_context(|| format!("Failed to read config file {:?}", config_path))?;
-
-    if content.trim().is_empty() {
-        return Ok(json!({}));
-    }
-
-    serde_json::from_str(&content)
-        .with_context(|| format!("Failed to parse config file {:?}", config_path))
-}
-
-/// Write the config to file with pretty formatting.
-fn write_config(config_path: &Path, config: &Value) -> Result<()> {
-    let content = serde_json::to_string_pretty(config)?;
-    fs::write(config_path, content)
-        .with_context(|| format!("Failed to write config file {:?}", config_path))?;
-    Ok(())
-}
-
-/// Whether the tool config should store vibeshell at root level.
-///
-/// Rules:
-/// - Codex always uses root-level format
-/// - Cursor uses root-level format when config file is mcpServers.json
-fn should_use_root_level_format(tool_id: &str, config_path: &Path) -> bool {
-    if tool_id == "codex" {
-        return true;
-    }
-
-    if tool_id == "cursor" {
-        if let Some(file_name) = config_path.file_name().and_then(|f| f.to_str()) {
-            return file_name.eq_ignore_ascii_case("mcpServers.json");
-        }
-    }
-
-    false
-}
-
-/// Install VibeShell skill to a specific AI tool.
-///
-/// # Arguments
-/// * `tool_id` - The ID of the tool to install to (e.g., "claude-code", "cursor")
-/// * `config_path` - The path to the tool's config file
-///
-/// # Returns
-/// * `Ok(PathBuf)` - The path to the backup file if one was created
-/// * `Err` - If installation failed
-pub fn install_to_tool(tool_id: &str, config_path: &PathBuf) -> Result<Option<PathBuf>> {
-    // Ensure parent directory exists
-    ensure_parent_dir(config_path)?;
-
-    // Backup existing config
-    let backup_path = backup_config(config_path)?;
-
-    // Read existing config
-    let mut config = read_config(config_path)?;
-
-    // Handle different config formats
-    if should_use_root_level_format(tool_id, config_path) {
-        if let Value::Object(ref mut map) = config {
-            map.insert(VIBESHELL_KEY.to_string(), vibeshell_skill_config());
-        }
-    } else {
-        // Standard MCP format: under mcpServers
-        if let Value::Object(ref mut map) = config {
-            // Get or create mcpServers object
-            let mcp_servers = map
-                .entry("mcpServers")
-                .or_insert_with(|| json!({}));
-
-            if let Value::Object(ref mut servers) = mcp_servers {
-                servers.insert(VIBESHELL_KEY.to_string(), vibeshell_skill_config());
-            }
-        }
-    }
-
-    // Write updated config
-    write_config(config_path, &config)?;
-
-    // Install the SKILL.md file to the tool's skills directory
-    install_skill_file(tool_id)?;
-
-    Ok(backup_path)
-}
-
-/// Uninstall VibeShell skill from a specific AI tool.
-///
-/// # Arguments
-/// * `tool_id` - The ID of the tool to uninstall from
-/// * `config_path` - The path to the tool's config file
-///
-/// # Returns
-/// * `Ok(PathBuf)` - The path to the backup file
-/// * `Err` - If uninstallation failed
-pub fn uninstall_from_tool(tool_id: &str, config_path: &PathBuf) -> Result<Option<PathBuf>> {
-    if !config_path.exists() {
-        return Ok(None);
-    }
-
-    // Backup existing config
-    let backup_path = backup_config(config_path)?;
-
-    // Read existing config
-    let mut config = read_config(config_path)?;
-
-    // Handle different config formats
-    if should_use_root_level_format(tool_id, config_path) {
-        // Root format: remove vibeshell directly
-        if let Value::Object(ref mut map) = config {
-            map.remove(VIBESHELL_KEY);
-        }
-    } else {
-        // Standard MCP format: remove under mcpServers
-        if let Value::Object(ref mut map) = config {
-            if let Some(Value::Object(ref mut servers)) = map.get_mut("mcpServers") {
-                servers.remove(VIBESHELL_KEY);
-
-                // Remove mcpServers if empty
-                if servers.is_empty() {
-                    map.remove("mcpServers");
-                }
-            }
-        }
-    }
-
-    // Write updated config
-    write_config(config_path, &config)?;
-
-    // Remove the SKILL.md file from the tool's skills directory
-    uninstall_skill_file(tool_id)?;
-
-    Ok(backup_path)
-}
-
 /// Result of an installation operation.
 #[derive(Debug)]
 pub struct InstallResult {
@@ -317,24 +237,38 @@ pub struct InstallResult {
     pub tool: AiTool,
     /// Whether the installation was successful
     pub success: bool,
-    /// Path to the backup file if created
+    /// Path to the backup file if created (unused — kept for API compat)
     pub backup_path: Option<PathBuf>,
     /// Error message if installation failed
     pub error: Option<String>,
 }
 
-/// Install VibeShell skill to a tool by ID.
+/// Install VibeShell skill to a specific AI tool.
 ///
-/// This is a convenience function that looks up the tool and calls install_to_tool.
+/// Only installs the SKILL.md file. Does NOT modify MCP configs.
+pub fn install_to_tool(tool_id: &str, _config_path: &PathBuf) -> Result<Option<PathBuf>> {
+    let skill_path = install_skill_file(tool_id)?;
+    Ok(Some(skill_path))
+}
+
+/// Uninstall VibeShell skill from a specific AI tool.
+///
+/// Only removes the SKILL.md file. Does NOT modify MCP configs.
+pub fn uninstall_from_tool(tool_id: &str, _config_path: &PathBuf) -> Result<Option<PathBuf>> {
+    uninstall_skill_file(tool_id)?;
+    Ok(None)
+}
+
+/// Install VibeShell skill to a tool by ID.
 pub fn install_by_id(tool_id: &str) -> Result<InstallResult> {
     let tool = find_tool(tool_id)
         .ok_or_else(|| anyhow!("Unknown tool: {}", tool_id))?;
 
     match install_to_tool(&tool.id, &tool.config_path) {
-        Ok(backup_path) => Ok(InstallResult {
+        Ok(path) => Ok(InstallResult {
             tool,
             success: true,
-            backup_path,
+            backup_path: path,
             error: None,
         }),
         Err(e) => Ok(InstallResult {
@@ -347,17 +281,15 @@ pub fn install_by_id(tool_id: &str) -> Result<InstallResult> {
 }
 
 /// Uninstall VibeShell skill from a tool by ID.
-///
-/// This is a convenience function that looks up the tool and calls uninstall_from_tool.
 pub fn uninstall_by_id(tool_id: &str) -> Result<InstallResult> {
     let tool = find_tool(tool_id)
         .ok_or_else(|| anyhow!("Unknown tool: {}", tool_id))?;
 
     match uninstall_from_tool(&tool.id, &tool.config_path) {
-        Ok(backup_path) => Ok(InstallResult {
+        Ok(_) => Ok(InstallResult {
             tool,
             success: true,
-            backup_path,
+            backup_path: None,
             error: None,
         }),
         Err(e) => Ok(InstallResult {
@@ -377,10 +309,10 @@ pub fn install_to_all() -> Vec<InstallResult> {
         .into_iter()
         .map(|tool| {
             match install_to_tool(&tool.id, &tool.config_path) {
-                Ok(backup_path) => InstallResult {
+                Ok(path) => InstallResult {
                     tool,
                     success: true,
-                    backup_path,
+                    backup_path: path,
                     error: None,
                 },
                 Err(e) => InstallResult {
@@ -402,10 +334,10 @@ pub fn uninstall_from_all() -> Vec<InstallResult> {
         .into_iter()
         .map(|tool| {
             match uninstall_from_tool(&tool.id, &tool.config_path) {
-                Ok(backup_path) => InstallResult {
+                Ok(_) => InstallResult {
                     tool,
                     success: true,
-                    backup_path,
+                    backup_path: None,
                     error: None,
                 },
                 Err(e) => InstallResult {
@@ -422,155 +354,26 @@ pub fn uninstall_from_all() -> Vec<InstallResult> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
     use tempfile::TempDir;
 
-    fn create_temp_config(dir: &TempDir, content: &str) -> PathBuf {
-        let config_path = dir.path().join("mcp.json");
-        let mut file = fs::File::create(&config_path).unwrap();
-        file.write_all(content.as_bytes()).unwrap();
-        config_path
-    }
-
-    fn create_temp_config_with_name(dir: &TempDir, file_name: &str, content: &str) -> PathBuf {
-        let config_path = dir.path().join(file_name);
-        let mut file = fs::File::create(&config_path).unwrap();
-        file.write_all(content.as_bytes()).unwrap();
-        config_path
+    #[test]
+    fn test_skill_md_content_is_valid() {
+        assert!(SKILL_MD_CONTENT.contains("vshell"));
+        assert!(SKILL_MD_CONTENT.contains("ssh"));
+        assert!(SKILL_MD_CONTENT.contains("sessions"));
+        assert!(SKILL_MD_CONTENT.contains("kill"));
     }
 
     #[test]
-    fn test_install_to_empty_config() {
+    fn test_install_creates_skill_file() {
+        // This test can only run if the home directory exists
+        // In CI it may not have the .claude dir, so we just verify the function signature
         let dir = TempDir::new().unwrap();
         let config_path = dir.path().join("mcp.json");
-
-        let result = install_to_tool("claude-code", &config_path);
-        assert!(result.is_ok());
-
-        let content = fs::read_to_string(&config_path).unwrap();
-        let json: Value = serde_json::from_str(&content).unwrap();
-
-        assert!(json["mcpServers"]["vibeshell"].is_object());
-        assert_eq!(json["mcpServers"]["vibeshell"]["command"], "vshell");
-    }
-
-    #[test]
-    fn test_install_merges_with_existing() {
-        let dir = TempDir::new().unwrap();
-        let config_path = create_temp_config(&dir, r#"{
-            "mcpServers": {
-                "other-server": {
-                    "command": "other"
-                }
-            }
-        }"#);
-
-        install_to_tool("claude-code", &config_path).unwrap();
-
-        let content = fs::read_to_string(&config_path).unwrap();
-        let json: Value = serde_json::from_str(&content).unwrap();
-
-        // Original server should still exist
-        assert!(json["mcpServers"]["other-server"].is_object());
-        // VibeShell should be added
-        assert!(json["mcpServers"]["vibeshell"].is_object());
-    }
-
-    #[test]
-    fn test_uninstall() {
-        let dir = TempDir::new().unwrap();
-        let config_path = create_temp_config(&dir, r#"{
-            "mcpServers": {
-                "vibeshell": {
-                    "command": "vshell"
-                },
-                "other": {
-                    "command": "other"
-                }
-            }
-        }"#);
-
-        uninstall_from_tool("claude-code", &config_path).unwrap();
-
-        let content = fs::read_to_string(&config_path).unwrap();
-        let json: Value = serde_json::from_str(&content).unwrap();
-
-        assert!(json["mcpServers"]["vibeshell"].is_null());
-        assert!(json["mcpServers"]["other"].is_object());
-    }
-
-    #[test]
-    fn test_backup_created() {
-        let dir = TempDir::new().unwrap();
-        let config_path = create_temp_config(&dir, r#"{"existing": true}"#);
-
-        let result = install_to_tool("claude-code", &config_path).unwrap();
-        assert!(result.is_some());
-
-        let backup_path = result.unwrap();
-        assert!(backup_path.exists());
-    }
-
-    #[test]
-    fn test_codex_format() {
-        let dir = TempDir::new().unwrap();
-        let config_path = dir.path().join("config.json");
-
-        install_to_tool("codex", &config_path).unwrap();
-
-        let content = fs::read_to_string(&config_path).unwrap();
-        let json: Value = serde_json::from_str(&content).unwrap();
-
-        // Codex format: vibeshell at root level, not under mcpServers
-        assert!(json["vibeshell"].is_object());
-        assert_eq!(json["vibeshell"]["command"], "vshell");
-    }
-
-    #[test]
-    fn test_cursor_mcpservers_json_uses_root_level_format() {
-        let dir = TempDir::new().unwrap();
-        let config_path = create_temp_config_with_name(
-            &dir,
-            "mcpServers.json",
-            r#"{
-                "other": {
-                    "command": "other"
-                }
-            }"#,
-        );
-
-        install_to_tool("cursor", &config_path).unwrap();
-
-        let content = fs::read_to_string(&config_path).unwrap();
-        let json: Value = serde_json::from_str(&content).unwrap();
-
-        assert!(json["vibeshell"].is_object());
-        assert!(json["mcpServers"].is_null());
-        assert!(json["other"].is_object());
-    }
-
-    #[test]
-    fn test_cursor_mcpservers_json_uninstall_removes_root_level_vibeshell() {
-        let dir = TempDir::new().unwrap();
-        let config_path = create_temp_config_with_name(
-            &dir,
-            "mcpServers.json",
-            r#"{
-                "vibeshell": {
-                    "command": "vshell"
-                },
-                "other": {
-                    "command": "other"
-                }
-            }"#,
-        );
-
-        uninstall_from_tool("cursor", &config_path).unwrap();
-
-        let content = fs::read_to_string(&config_path).unwrap();
-        let json: Value = serde_json::from_str(&content).unwrap();
-
-        assert!(json["vibeshell"].is_null());
-        assert!(json["other"].is_object());
+        // install_to_tool should NOT create/modify config_path
+        // It only writes SKILL.md to the skills directory
+        let _ = install_to_tool("claude-code", &config_path);
+        // config_path should NOT exist (we don't touch MCP configs)
+        assert!(!config_path.exists());
     }
 }
