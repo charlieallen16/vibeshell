@@ -58,6 +58,9 @@ Desktop.ini
 # ============================================
 src-tauri/target/
 src-tauri/gen/
+# Sidecar binaries (built by CI, stubs created by build.rs)
+src-tauri/binaries/vshell*
+!src-tauri/binaries/.gitkeep
 
 # ============================================
 # Logs & build outputs

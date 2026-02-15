@@ -43,7 +43,6 @@ jobs:
   bump-and-release:
     name: Bump Version & Create Release
     runs-on: ubuntu-latest
-    # Skip if the commit was made by this workflow (prevent infinite loop)
     if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, 'chore: bump version')"
     outputs:
       release_id: ${{ steps.create_release.outputs.id }}
@@ -64,18 +63,14 @@ jobs:
       - name: Bump version
         id: bump
         run: |
-          # Read current version
           CURRENT=$(jq -r .version src-tauri/tauri.conf.json)
           echo "Current version: $CURRENT"
 
-          # Determine bump type
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
-            # Tag push — use the tag version directly
             NEW_VERSION="${GITHUB_REF#refs/tags/v}"
             echo "Tag push: using version $NEW_VERSION"
           elif [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
             BUMP="${{ github.event.inputs.bump }}"
-            echo "Manual dispatch with bump=$BUMP"
             IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
             case "$BUMP" in
               major) NEW_VERSION="$((MAJOR+1)).0.0" ;;
@@ -83,7 +78,6 @@ jobs:
               patch) NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH+1))" ;;
             esac
           else
-            # Branch push — auto bump patch
             IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
             NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH+1))"
             echo "Branch push: auto bumping patch $CURRENT → $NEW_VERSION"
@@ -92,26 +86,13 @@ jobs:
           TAG_NAME="v${NEW_VERSION}"
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+          echo "should_build=true" >> $GITHUB_OUTPUT
 
-          # Check if tag already exists (for tag pushes)
-          if [[ "$GITHUB_REF" == refs/tags/v* ]] && git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-            echo "should_build=true" >> $GITHUB_OUTPUT
-          else
-            echo "should_build=true" >> $GITHUB_OUTPUT
-          fi
-
-          # Update version in config files (only for branch pushes and manual dispatch)
+          # Update version in config files (only for non-tag pushes)
           if [[ "$GITHUB_REF" != refs/tags/v* ]]; then
-            # Update tauri.conf.json
             jq --arg v "$NEW_VERSION" '.version = $v' src-tauri/tauri.conf.json > tmp.json && mv tmp.json src-tauri/tauri.conf.json
-
-            # Update package.json
             jq --arg v "$NEW_VERSION" '.version = $v' package.json > tmp.json && mv tmp.json package.json
-
-            # Update workspace Cargo.toml version
             sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
-
-            echo "Updated version files to $NEW_VERSION"
           fi
 
       - name: Commit version bump
@@ -119,8 +100,6 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Only commit if there are changes
           if git diff --quiet; then
             echo "No version changes to commit"
           else
@@ -139,14 +118,15 @@ jobs:
             ## VibeShell ${{ steps.bump.outputs.tag_name }}
 
             ### Downloads
-            | Platform | File |
-            |----------|------|
-            | Windows x64 | `VibeShell_${{ steps.bump.outputs.new_version }}_x64-setup.exe` / `.msi` |
-            | macOS (Apple Silicon) | `VibeShell_${{ steps.bump.outputs.new_version }}_aarch64.dmg` |
-            | macOS (Intel) | `VibeShell_${{ steps.bump.outputs.new_version }}_x64.dmg` |
-            | Linux x64 | `.deb` / `.AppImage` |
+            | Platform | Installer | CLI Only |
+            |----------|-----------|----------|
+            | Windows x64 | `.exe` / `.msi` | `vshell-windows-x64.exe` |
+            | macOS (Apple Silicon) | `.dmg` | `vshell-macos-arm64` |
+            | macOS (Intel) | `.dmg` | `vshell-macos-x64` |
+            | Linux x64 | `.deb` / `.AppImage` | `vshell-linux-x64` |
 
-            ### What's Changed
+            > **Note:** The desktop installer includes `vshell` CLI and adds it to your PATH automatically.
+
             See [commit history](https://github.com/${{ github.repository }}/commits/${{ steps.bump.outputs.tag_name }}) for full changes.
           draft: false
           prerelease: false
@@ -165,21 +145,24 @@ jobs:
           - platform: windows-latest
             name: Windows x64
             args: ''
+            target: x86_64-pc-windows-msvc
           - platform: macos-latest
             name: macOS ARM64
             args: '--target aarch64-apple-darwin'
+            target: aarch64-apple-darwin
           - platform: macos-latest
             name: macOS x64
             args: '--target x86_64-apple-darwin'
+            target: x86_64-apple-darwin
           - platform: ubuntu-22.04
             name: Linux x64
             args: ''
+            target: x86_64-unknown-linux-gnu
 
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
         with:
-          # Pull latest commit (including version bump)
           ref: ${{ github.ref_name }}
 
       - name: Install Linux dependencies
@@ -208,14 +191,37 @@ jobs:
         run: npm ci
 
       - name: Build vshell CLI
+        shell: bash
         run: |
-          if [[ "${{ matrix.args }}" == *"--target"* ]]; then
-            TARGET=$(echo "${{ matrix.args }}" | grep -oP '(?<=--target )\S+')
-            cargo build --release --package vshell --target $TARGET
+          if [[ "${{ matrix.target }}" != "" && "${{ matrix.args }}" == *"--target"* ]]; then
+            cargo build --release --package vshell --target ${{ matrix.target }}
           else
             cargo build --release --package vshell
           fi
+
+      - name: Copy vshell to sidecar location
         shell: bash
+        run: |
+          mkdir -p src-tauri/binaries
+          TARGET="${{ matrix.target }}"
+          EXT=""
+          if [[ "${{ matrix.platform }}" == "windows-latest" ]]; then
+            EXT=".exe"
+          fi
+
+          # Determine source path
+          if [[ "${{ matrix.args }}" == *"--target"* ]]; then
+            SRC="target/${TARGET}/release/vshell${EXT}"
+          else
+            SRC="target/release/vshell${EXT}"
+          fi
+
+          DEST="src-tauri/binaries/vshell-${TARGET}${EXT}"
+
+          echo "Copying $SRC -> $DEST"
+          cp "$SRC" "$DEST"
+          chmod +x "$DEST" 2>/dev/null || true
+          ls -la src-tauri/binaries/
 
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
@@ -228,20 +234,24 @@ jobs:
       - name: Rename and upload vshell CLI binary
         shell: bash
         run: |
-          VERSION="${{ needs.bump-and-release.outputs.new_version }}"
+          VERSION="${{ needs.bump-and-release.outputs.version }}"
+          TARGET="${{ matrix.target }}"
+          EXT=""
+
+          if [[ "${{ matrix.platform }}" == "windows-latest" ]]; then
+            EXT=".exe"
+          fi
 
           # Find the built vshell binary
           if [[ "${{ matrix.args }}" == *"--target"* ]]; then
-            TARGET=$(echo "${{ matrix.args }}" | grep -oP '(?<=--target )\S+' || true)
-            BINARY="target/${TARGET}/release/vshell"
+            BINARY="target/${TARGET}/release/vshell${EXT}"
           else
-            BINARY="target/release/vshell"
+            BINARY="target/release/vshell${EXT}"
           fi
 
-          # Determine platform suffix and extension
+          # Determine platform-friendly name
           case "${{ matrix.platform }}" in
             windows-latest)
-              BINARY="${BINARY}.exe"
               DEST="vshell-${VERSION}-windows-x64.exe"
               ;;
             macos-latest)

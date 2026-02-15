@@ -17,8 +17,8 @@ pub fn list_tools() -> Result<()> {
     println!("Detected AI Tools:");
     println!("{:-<60}", "");
     println!(
-        "{:<15} {:<15} {:<20} {}",
-        "ID", "NAME", "INSTALLED", "VIBESHELL"
+        "{:<15} {:<15} {:<20} VIBESHELL",
+        "ID", "NAME", "INSTALLED"
     );
     println!("{:-<60}", "");
 

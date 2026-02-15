@@ -105,6 +105,25 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
+        .setup(|_app| {
+            // Ensure vshell CLI is accessible in PATH on all platforms.
+            // On macOS/Linux: create symlink in /usr/local/bin/ if not already there.
+            // On Windows: NSIS installer handles PATH via nsis-hooks.nsh.
+            #[cfg(not(windows))]
+            {
+                let vshell_path = install::resolve_vshell_binary();
+                let vshell = std::path::Path::new(&vshell_path);
+                let link = std::path::Path::new("/usr/local/bin/vshell");
+                if vshell.exists() && !link.exists() {
+                    if let Err(e) = std::os::unix::fs::symlink(vshell, link) {
+                        log::warn!("[Setup] Could not create /usr/local/bin/vshell symlink: {}", e);
+                    } else {
+                        log::info!("[Setup] Created symlink /usr/local/bin/vshell -> {}", vshell_path);
+                    }
+                }
+            }
+            Ok(())
+        })
         .manage(database)
         .manage(session_manager)
         .manage(sftp_state)

@@ -114,10 +114,9 @@ pub fn add_vshell_to_path() -> Result<String, String> {
         ));
     }
 
-    let vshell_dir = vshell.parent().ok_or("Cannot determine vshell directory")?;
-
     #[cfg(windows)]
     {
+        let vshell_dir = vshell.parent().ok_or("Cannot determine vshell directory")?;
         add_to_windows_path(vshell_dir).map_err(|e| e.to_string())
     }
 
@@ -138,9 +137,7 @@ fn add_to_windows_path(dir: &std::path::Path) -> Result<String, String> {
     let output = Command::new("powershell")
         .args([
             "-NoProfile", "-Command",
-            &format!(
-                "[Environment]::GetEnvironmentVariable('PATH', 'User')"
-            ),
+            "[Environment]::GetEnvironmentVariable('PATH', 'User')",
         ])
         .output()
         .map_err(|e| format!("Failed to read PATH: {}", e))?;

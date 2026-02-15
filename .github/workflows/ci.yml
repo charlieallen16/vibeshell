@@ -87,11 +87,9 @@ jobs:
 
       - name: Cargo check
         run: cargo check
-        working-directory: src-tauri
 
       - name: Cargo test
         run: cargo test
-        working-directory: src-tauri
 
   check-clippy:
     name: Clippy Lint
@@ -128,4 +126,3 @@ jobs:
 
       - name: Run clippy
         run: cargo clippy -- -D warnings
-        working-directory: src-tauri
